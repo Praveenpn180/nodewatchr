@@ -9,6 +9,10 @@ export class BaseAdapter {
       : TemplateEngine.default();
   }
 
+  formatTimestamp(ts) {                            // ← add this back
+    return new Date(ts).toISOString();
+  }
+
   formatText(alert) {
     // Check for rule-level template override first, then adapter-level
     const ruleTemplate = alert.rule.templates?.[this.constructor.name.toLowerCase()];

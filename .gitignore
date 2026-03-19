@@ -1,5 +1,14 @@
-node_modules
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Pack artifacts
+*.tgz
+
+# Runtime artifacts
+.nodewatchr/
+test.log
+
+# Real config
 nodewatchr.config.js
 .env
-test.log
-.nodewatchr/

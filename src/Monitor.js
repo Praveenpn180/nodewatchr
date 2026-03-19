@@ -3,7 +3,7 @@ import { RuleEngine }      from './engine/RuleEngine.js';
 import { AlertBuffer }     from './engine/AlertBuffer.js';
 import { Dispatcher }      from './adapters/Dispatcher.js';
 import { resolveAdapters } from './adapters/AdapterRegistry.js';
-
+import { EventEmitter }    from 'events';
 export class Monitor extends EventEmitter {
   constructor({ rules, adapters: adapterConfigs, dispatcher: dispatcherOptions = {} }) {
     super();
