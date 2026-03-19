@@ -6,8 +6,8 @@ import { StreamWatcher } from './ingestion/StreamWatcher.js';
 import { ConfigWatcher } from './config/ConfigWatcher.js';
 
 export async function bootstrap({ configPath, hotReload, deadLetterDir }) {
-  let config  = await loadConfig(configPath);
-  let monitor = await createMonitor(config, deadLetterDir);
+  const config  = await loadConfig(configPath);
+  const monitor = await createMonitor(config, deadLetterDir);
 
   if (hotReload) {
     const cw = new ConfigWatcher(configPath);

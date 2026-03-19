@@ -1,35 +1,48 @@
-// src/Monitor.js — updated for Phase 3
-import { RuleEngine }      from './engine/RuleEngine.js';
-import { AlertBuffer }     from './engine/AlertBuffer.js';
-import { Dispatcher }      from './adapters/Dispatcher.js';
+import { EventEmitter } from 'events';
+import { Dispatcher } from './adapters/Dispatcher.js';
 import { resolveAdapters } from './adapters/AdapterRegistry.js';
-import { EventEmitter }    from 'events';
+import { AlertBuffer } from './engine/AlertBuffer.js';
+import { RuleEngine } from './engine/RuleEngine.js';
+
 export class Monitor extends EventEmitter {
   constructor({ rules, adapters: adapterConfigs, dispatcher: dispatcherOptions = {} }) {
     super();
-    this._adapterConfigs    = adapterConfigs;
+    this._adapterConfigs = adapterConfigs;
     this._dispatcherOptions = dispatcherOptions;
-    this.engine = new RuleEngine(rules);
+    this._watchers = new Set();
+    this._watcherHandlers = new Map();
     this.buffer = new AlertBuffer();
+    this.engine = new RuleEngine(rules);
+    this._onMatch = e => this.buffer.ingest(e);
 
-    this.engine.on('match', e  => this.buffer.ingest(e));
+    this.engine.on('match', this._onMatch);
     this.buffer.on('alert', alert => this._onAlert(alert));
   }
 
   async _onAlert(alert) {
-    this.emit('alert', alert);           // still available for programmatic use
+    this.emit('alert', alert);
     await this.dispatcher?.dispatch(alert);
   }
 
   async start() {
-    const adapters = await resolveAdapters(this._adapterConfigs);
-    this.dispatcher = new Dispatcher(adapters, this._dispatcherOptions);
+    if (!this.dispatcher) {
+      const adapters = await resolveAdapters(this._adapterConfigs);
+      this.dispatcher = new Dispatcher(adapters, this._dispatcherOptions);
+    }
+
     this.buffer.startCleanup();
     return this;
   }
 
   attachWatcher(watcher) {
-    watcher.on('line', e => this.engine.evaluate(e));
+    if (this._watchers.has(watcher)) {
+      return this;
+    }
+
+    const onLine = e => this.engine.evaluate(e);
+    this._watchers.add(watcher);
+    this._watcherHandlers.set(watcher, onLine);
+    watcher.on('line', onLine);
     return this;
   }
 
@@ -38,27 +51,23 @@ export class Monitor extends EventEmitter {
   }
 
   swapRules(newRules) {
-  // Validate the new rules construct cleanly before touching live state
-  const newEngine = new RuleEngine(newRules);
+    const newEngine = new RuleEngine(newRules);
+    const oldEngine = this.engine;
 
-  // Swap atomically — no window where the monitor is rule-less
-  const oldEngine = this.engine;
-  this.engine = newEngine;
+    this.engine = newEngine;
+    oldEngine.off('match', this._onMatch);
+    this.engine.on('match', this._onMatch);
 
-  // Re-wire: buffer was listening to old engine's 'match' events
-  oldEngine.removeAllListeners('match');
-  this.engine.on('match', e => this.buffer.ingest(e));
+    for (const watcher of this._watchers) {
+      const oldOnLine = this._watcherHandlers.get(watcher);
+      const nextOnLine = e => this.engine.evaluate(e);
 
-  // Re-wire all active watchers to the new engine
-  for (const watcher of this._watchers) {
-    watcher.removeAllListeners('line');
-    watcher.on('line', e => this.engine.evaluate(e));
+      if (oldOnLine) {
+        watcher.off('line', oldOnLine);
+      }
+
+      this._watcherHandlers.set(watcher, nextOnLine);
+      watcher.on('line', nextOnLine);
+    }
   }
-}
-attachWatcher(watcher) {
-  this._watchers ??= [];
-  this._watchers.push(watcher);
-  watcher.on('line', e => this.engine.evaluate(e));
-  return this;
-}
 }

@@ -15,7 +15,7 @@ export class EmailAdapter extends BaseAdapter {
   }
 
   async send(alert) {
-    const { rule, line, timestamp, count } = alert;
+    const { rule, count } = alert;
 
     await this._transport.sendMail({
       from: this.config.from,

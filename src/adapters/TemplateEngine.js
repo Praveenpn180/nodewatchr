@@ -7,7 +7,7 @@ const BUILT_IN_TOKENS = {
   '{{timestamp}}':  a => new Date(a.timestamp).toISOString(),
   '{{severity}}':   a => a.rule.severity ?? 'warning',
   '{{env}}':        _  => process.env.NODE_ENV ?? 'unknown',
-  '{{hostname}}':   _  => new URL('file:///' + process.env.HOSTNAME ?? 'unknown').hostname,
+  '{{hostname}}':   _  => process.env.HOSTNAME ?? 'unknown',
 };
 
 export class TemplateEngine {

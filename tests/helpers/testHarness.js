@@ -1,22 +1,21 @@
-// tests/helpers/testHarness.js
-import { mkdtemp, appendFile, rm } from 'fs/promises';
-import { join } from 'path';
+import { appendFile, mkdtemp, rm } from 'fs/promises';
 import { tmpdir } from 'os';
-import { Monitor }      from '../../src/Monitor.js';
-import { FileWatcher }  from '../../src/ingestion/FileWatcher.js';
+import { join } from 'path';
+import { Monitor } from '../../src/Monitor.js';
+import { FileWatcher } from '../../src/ingestion/FileWatcher.js';
 
 export async function createHarness(rules, adapterStubs = []) {
-  const dir  = await mkdtemp(join(tmpdir(), 'nodewatchr-'));
+  const dir = await mkdtemp(join(tmpdir(), 'nodewatchr-'));
   const file = join(dir, 'test.log');
 
-  // Write the file first so FileWatcher has something to stat
   await appendFile(file, '');
 
   const monitor = new Monitor({ rules, adapters: [] });
-  // Inject stubs directly — bypass AdapterRegistry
-  monitor.dispatcher = { dispatch: async (alert) => {
-    for (const stub of adapterStubs) await stub(alert);
-  }};
+  monitor.dispatcher = {
+    dispatch: async (alert) => {
+      await Promise.allSettled(adapterStubs.map(stub => stub(alert)));
+    },
+  };
 
   const watcher = new FileWatcher(file);
   monitor.attachWatcher(watcher);
@@ -25,7 +24,7 @@ export async function createHarness(rules, adapterStubs = []) {
 
   return {
     monitor,
-    writeLine: (line) => appendFile(file, line + '\n'),
+    writeLine: line => appendFile(file, `${line}\n`),
     cleanup: async () => {
       monitor.stop();
       watcher.stop();
