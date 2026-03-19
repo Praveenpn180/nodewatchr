@@ -1,0 +1,36 @@
+{
+  "name": "@praveenpn180/nodewatchr",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Configurable log monitoring and alerting for Node.js applications",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./adapters/base": "./src/adapters/BaseAdapter.js"
+  },
+    "bin": { "nodewatchr": "./bin/nodewatchr.js" },
+
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "src","bin"
+  ],
+  "keywords": ["monitoring", "logging", "alerts", "telegram", "slack", "devops"],
+  "scripts": {
+  "test": "vitest run",
+  "lint": "eslint src bin",
+  "prepublishOnly": "pnpm lint && pnpm test"
+},
+  "dependencies": {
+    "chokidar": "^3.6.0",
+    "zod": "^3.25.76",
+    "commander": "^12.0.0"
+  },
+  "devDependencies": {
+    "eslint": "^9.0.0",
+    "vitest": "^1.6.0"
+  },
+  "packageManager": "pnpm@10.32.1"
+
+}

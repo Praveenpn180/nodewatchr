@@ -1,0 +1,8 @@
+tests/
+*.test.js
+.github/
+examples/
+nodewatchr.config.js
+vitest.config.js
+eslint.config.js
+.nodewatchr/
