@@ -6,7 +6,7 @@ rules are triggered.
 
 ## Install
 
-npm install @praveenpn180/nodewatchr
+npm install nodewatchr
 
 ## Quickstart
 

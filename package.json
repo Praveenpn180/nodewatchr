@@ -1,6 +1,6 @@
 {
-  "name": "@praveenpn180/nodewatchr",
-  "version": "0.1.1",
+  "name": "nodewatchr",
+  "version": "0.1.2",
   "type": "module",
   "description": "Configurable log monitoring and alerting for Node.js applications",
   "main": "./src/index.js",
