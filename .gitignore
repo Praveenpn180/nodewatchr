@@ -1,1 +1,5 @@
 node_modules
+nodewatchr.config.js
+.env
+test.log
+.nodewatchr/
