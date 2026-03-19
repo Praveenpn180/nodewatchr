@@ -5,7 +5,7 @@ import { Monitor } from '../../src/Monitor.js';
 import { FileWatcher } from '../../src/ingestion/FileWatcher.js';
 
 export async function createHarness(rules, adapterStubs = []) {
-  const dir = await mkdtemp(join(tmpdir(), 'nodewatchr-'));
+  const dir = await mkdtemp(join(tmpdir(), 'alertengine-'));
   const file = join(dir, 'test.log');
 
   await appendFile(file, '');

@@ -7,7 +7,7 @@ export default [
     files: ['src/**/*.js', 'bin/**/*.js'],
     rules: {
       'no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
-      'no-console': 'off',          // nodewatchr legitimately uses console
+      'no-console': 'off',          // alertengine-js legitimately uses console
       'prefer-const': 'error',
       'no-var': 'error',
     },

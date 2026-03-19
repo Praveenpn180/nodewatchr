@@ -4,7 +4,7 @@
 
 Watch `stdout`, `stderr`, or log files and fire alerts to **Telegram**, **Slack**, **Discord**, or **Email** when configurable rules are triggered — with zero build step required.
 
-[![CI](https://github.com/Praveenpn180/nodewatchr/actions/workflows/ci.yml/badge.svg)](https://github.com/Praveenpn180/nodewatchr/actions/workflows/ci.yml)
+[![CI](https://github.com/Praveenpn180/alertengine-js/actions/workflows/ci.yml/badge.svg)](https://github.com/Praveenpn180/alertengine-js/actions/workflows/ci.yml)
 [![npm version](https://img.shields.io/npm/v/alertengine-js)](https://www.npmjs.com/package/alertengine-js)
 [![Node.js >= 18](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](https://nodejs.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -46,7 +46,7 @@ Watch `stdout`, `stderr`, or log files and fire alerts to **Telegram**, **Slack*
 - **Alert deduplication** — fingerprints alerts to suppress noise and prevent storm conditions
 - **Per-rule cooldowns** — configurable silence windows after an alert fires
 - **Four built-in adapters** — Telegram, Slack, Discord, and Email (SMTP)
-- **Custom adapter support** — install any `alertengine-js-*` adapter from npm
+- **Custom adapter support** — install any `alertengine-*` adapter from npm
 - **Alert templating** — per-rule, per-adapter message templates with token substitution
 - **Hot config reload** — edit rules without restarting the process
 - **Dead-letter logging** — failed alerts written to disk for replay
@@ -71,39 +71,195 @@ yarn add alertengine-js
 
 ## Quickstart
 
-**1. Copy the example config:**
+This shows how to add alertengine-js to a real Node.js project — a production Express API that writes logs to a file and needs to alert the team when things go wrong.
+
+### Step 1 — Install
 
 ```bash
-cp alertengine-js.config.example.js alertengine-js.config.js
+pnpm add alertengine-js
 ```
 
-**2. Set your notification credentials as environment variables:**
+### Step 2 — Set up your notification channel
+
+Pick one to start. You can add more later by adding entries to the `adapters` array.
+
+<details>
+<summary><strong>Telegram</strong> (recommended — free, instant, no workspace needed)</summary>
+
+1. Open Telegram → search `@BotFather` → send `/newbot`
+2. Follow the prompts and copy the token it gives you
+3. Send any message to your new bot to start the chat
+4. Open this URL in your browser (replace `YOUR_TOKEN`):
+   `https://api.telegram.org/botYOUR_TOKEN/getUpdates`
+5. Find `"id"` inside the `"chat"` object in the response
 
 ```bash
-# Telegram (see "Telegram setup" below for how to get these)
-export TG_TOKEN=your_bot_token
-export TG_CHAT_ID=your_chat_id
+# Add to your .env file
+TG_TOKEN=123456789:ABCdefGHIjklMNOpqrSTUvwxYZ
+TG_CHAT_ID=987654321
 ```
+</details>
 
-**3. Create a log file to watch:**
+<details>
+<summary><strong>Slack</strong></summary>
+
+1. Go to [api.slack.com/apps](https://api.slack.com/apps) → Create New App → From scratch
+2. Under **Features**, click **Incoming Webhooks** → toggle on → Add New Webhook to Workspace
+3. Choose a channel and click Allow
+4. Copy the webhook URL
 
 ```bash
-touch test.log
+# Add to your .env file
+SLACK_WEBHOOK=https://hooks.slack.com/services/T00000/B00000/XXXXXXXX
 ```
+</details>
 
-**4. Run:**
+<details>
+<summary><strong>Discord</strong></summary>
+
+1. Open Discord → go to your server → channel settings → Integrations → Webhooks
+2. Click New Webhook, give it a name, choose a channel
+3. Copy the webhook URL
 
 ```bash
-npx alertengine-js --config ./alertengine-js.config.js
+# Add to your .env file
+DISCORD_WEBHOOK=https://discord.com/api/webhooks/000000/XXXXXXXX
 ```
+</details>
 
-**5. Trigger a test alert in a second terminal:**
+<details>
+<summary><strong>Email (SMTP)</strong></summary>
+
+Works with Gmail, AWS SES, Mailgun, Postmark, or any SMTP provider.
 
 ```bash
-echo "ERROR Something broke in production" >> test.log
+# Add to your .env file
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=you@gmail.com
+SMTP_PASS=your_app_password   # Gmail: use an App Password, not your login password
+ALERT_FROM=alerts@yourapp.com
+ALERT_TO=oncall@yourteam.com
+```
+</details>
+
+### Step 3 — Create the config file
+
+Create `alertengine.config.js` in your project root. This example monitors an Express API log file for the most common production failure patterns:
+
+```js
+// alertengine.config.js
+export default {
+  watchers: [
+    // Watch wherever your app writes logs
+    // For PM2:     /root/.pm2/logs/your-app-out.log
+    // For Docker:  mount the log file as a volume and point here
+    // For Winston: wherever you configured your file transport
+    { type: 'file', path: './logs/app.log' },
+  ],
+
+  rules: [
+    {
+      // Fire the moment any unhandled error or fatal message appears
+      name: 'fatal-error',
+      match: /FATAL|unhandledRejection|uncaughtException/i,
+      cooldownMs: 60_000,       // at most once per minute
+      severity: 'critical',
+    },
+    {
+      // Alert after 10 errors accumulate within 2 minutes — avoids noise
+      // from a single bad request but catches a real error wave
+      name: 'error-spike',
+      match: /\bERROR\b/i,
+      threshold: { count: 10, windowMs: 120_000 },
+      cooldownMs: 300_000,      // silence for 5 minutes after firing
+      severity: 'warning',
+    },
+    {
+      // Out-of-memory crashes — always critical, fire immediately
+      name: 'oom-killer',
+      match: /JavaScript heap out of memory/,
+      threshold: { count: 1, windowMs: 1_000 },
+      cooldownMs: 0,
+      severity: 'critical',
+      templates: {
+        telegram: '💀 *OOM crash on {{hostname}}*\n`{{line}}`\n_{{timestamp}}_',
+        slack:    ':skull: *OOM crash* on `{{hostname}}`\n>{{line}}',
+      },
+    },
+    {
+      // Detect a sudden log rate spike — catches cascading failures
+      // before individual error patterns do
+      name: 'log-rate-spike',
+      match: /.+/,
+      rateThreshold: {
+        shortWindowMs: 10_000,   // last 10 seconds
+        longWindowMs:  300_000,  // vs 5-minute baseline
+        multiplier:    15,        // fire if 15× busier than normal
+      },
+      cooldownMs: 120_000,
+      severity: 'warning',
+    },
+  ],
+
+  adapters: [
+    // All adapters run in parallel — a failure in one does not block others
+    {
+      type:     'telegram',
+      token:    process.env.TG_TOKEN,
+      chatId:   process.env.TG_CHAT_ID,
+      // Default template for all rules that don't define their own
+      template: '🚨 *[{{severity}}] {{ruleName}}*\n`{{line}}`\n_{{env}} • {{hostname}} • {{timestamp}}_',
+    },
+  ],
+}
 ```
 
-You should receive a Telegram message within 1–2 seconds.
+### Step 4 — Load your `.env` and run
+
+```bash
+# Using dotenv-cli (pnpm add -D dotenv-cli)
+dotenv -- npx alertengine-js --config ./alertengine.config.js
+
+# Or export vars manually in your shell
+export $(cat .env | xargs) && npx alertengine-js --config ./alertengine.config.js
+```
+
+### Step 5 — Run it alongside your app in production
+
+The most common production setup is running alertengine-js as a sidecar process via PM2:
+
+```js
+// ecosystem.config.cjs  (your existing PM2 config)
+module.exports = {
+  apps: [
+    {
+      name: 'api',
+      script: 'src/server.js',
+      // Make sure your app writes logs to a file PM2 or Winston controls
+    },
+    {
+      // alertengine-js runs as a separate process watching the same log file
+      name: 'alertengine-js',
+      script: 'node_modules/.bin/alertengine-js',
+      args: '--config ./alertengine.config.js',
+      watch: false,
+      env: {
+        TG_TOKEN:    process.env.TG_TOKEN,
+        TG_CHAT_ID:  process.env.TG_CHAT_ID,
+        NODE_ENV:    'production',
+      },
+    },
+  ],
+}
+```
+
+```bash
+pm2 start ecosystem.config.cjs
+pm2 save
+```
+
+alertengine-js will now restart automatically if it crashes, and both processes are managed together. You'll start receiving alerts the moment your app logs a matching line.
 
 ---
 
@@ -125,10 +281,10 @@ Every line emitted by a watcher is evaluated against all configured rules. If a 
 
 ## Config reference
 
-Create a `alertengine-js.config.js` file (or `.json`) in your project root:
+Create a `alertengine.config.js` file (or `.json`) in your project root:
 
 ```js
-// alertengine-js.config.js
+// alertengine.config.js
 export default {
   watchers: [ ... ],
   rules:    [ ... ],
@@ -229,120 +385,291 @@ See [Notification adapters](#notification-adapters) for per-adapter config field
 
 ## Notification adapters
 
+Multiple adapters can run simultaneously — add as many as you need to the `adapters` array. All are called in parallel when an alert fires. A failure in one (e.g. Telegram is rate-limited) never blocks the others.
+
+```js
+adapters: [
+  { type: 'telegram', ... },
+  { type: 'slack',    ... },
+  { type: 'discord',  ... },
+  { type: 'email',    ... },
+]
+```
+
+---
+
 ### Telegram
 
-The simplest adapter to set up — no OAuth, just a bot token and a chat ID.
+The fastest adapter to get working — no workspace, no OAuth, just a bot token and a chat ID. Free with no message limits at alert volumes.
 
-**Setup (5 minutes):**
+**Getting your credentials:**
 
-1. Open Telegram and search for `@BotFather`
-2. Send `/newbot` and follow the prompts
-3. Copy the token BotFather gives you → `TG_TOKEN`
-4. Start a conversation with your new bot (send any message)
-5. Open `https://api.telegram.org/botYOUR_TOKEN/getUpdates` in your browser
-6. Find `"id"` inside the `"chat"` object → `TG_CHAT_ID`
+```
+1. Open Telegram → search @BotFather → send /newbot
+2. Give your bot a name (e.g. "MyApp Alerts") and a username (e.g. myapp_alerts_bot)
+3. BotFather replies with your token — copy it
 
+4. Search for your new bot and send it any message (e.g. "hello")
+   This step is required — bots cannot message you until you initiate contact
+
+5. Open this URL in your browser (replace YOUR_TOKEN):
+   https://api.telegram.org/botYOUR_TOKEN/getUpdates
+
+6. In the JSON response, find:
+   result[0].message.chat.id  ← this is your TG_CHAT_ID
+```
+
+**`.env`:**
+```bash
+TG_TOKEN=123456789:ABCdefGHIjklMNOpqrSTUvwxYZ
+TG_CHAT_ID=987654321
+```
+
+**Config:**
 ```js
 {
   type:     'telegram',
-  token:    process.env.TG_TOKEN,   // required
-  chatId:   process.env.TG_CHAT_ID, // required
-  threadId: '12345',                // optional — for topic-based supergroups
-  template: '🚨 *{{ruleName}}*\n`{{line}}`\n_{{timestamp}}_', // optional
+  token:    process.env.TG_TOKEN,    // required
+  chatId:   process.env.TG_CHAT_ID,  // required
+  threadId: '42',                    // optional — send to a specific topic in a supergroup
+  template: '🚨 *[{{severity}}] {{ruleName}}*\n`{{line}}`\n_{{timestamp}}_',
 }
+```
+
+**Sending to a Telegram channel instead of a personal chat:**
+
+Add your bot as an admin to the channel, then use the channel's username or numeric ID as `chatId`:
+
+```js
+chatId: '@your_channel_username'   // public channel
+chatId: '-1001234567890'           // private channel (negative number with -100 prefix)
 ```
 
 | Field | Required | Description |
 |---|---|---|
 | `token` | ✅ | Bot API token from @BotFather |
-| `chatId` | ✅ | Chat or channel ID to send messages to |
-| `threadId` | — | Message thread ID for topic-based supergroups |
-| `template` | — | Custom message template (MarkdownV2 formatting) |
+| `chatId` | ✅ | Personal chat ID, group ID, or channel username |
+| `threadId` | — | Topic ID for supergroups with topics enabled |
+| `template` | — | Message template — supports Telegram MarkdownV2 |
 
 ---
 
 ### Slack
 
-Uses [Incoming Webhooks](https://api.slack.com/messaging/webhooks) — no OAuth flow required.
+Uses [Incoming Webhooks](https://api.slack.com/messaging/webhooks) — a single URL, no OAuth tokens or scopes to manage.
 
-**Setup:**
+**Getting your webhook URL:**
 
-1. Go to `api.slack.com/apps` → Create New App → From scratch
-2. Enable **Incoming Webhooks** and add a webhook to your workspace
-3. Copy the webhook URL → `SLACK_WEBHOOK`
+```
+1. Go to https://api.slack.com/apps → Create New App → From scratch
+2. Name it (e.g. "alertengine-js") and select your workspace
+3. In the left sidebar: Features → Incoming Webhooks → toggle On
+4. Click "Add New Webhook to Workspace"
+5. Choose the channel where alerts should appear → click Allow
+6. Copy the webhook URL — it looks like:
+   https://hooks.slack.com/services/T.../B.../XXXXXXXX...
+```
 
+**`.env`:**
+```bash
+SLACK_WEBHOOK=https://hooks.slack.com/services/T.../B.../XXXXXXXX...
+```
+
+**Config:**
 ```js
 {
   type:       'slack',
-  webhookUrl: process.env.SLACK_WEBHOOK, // required
-  template:   ':rotating_light: *{{ruleName}}* — {{count}} matches', // optional
+  webhookUrl: process.env.SLACK_WEBHOOK,  // required
+  template:   ':rotating_light: *[{{severity}}] {{ruleName}}*\n>{{line}}\n_{{env}} • {{hostname}} • {{timestamp}}_',
 }
 ```
+
+Alerts are sent as [Block Kit](https://api.slack.com/block-kit) messages with a header, severity and match count fields, and the matched log line in a code block.
+
+| Field | Required | Description |
+|---|---|---|
+| `webhookUrl` | ✅ | Incoming webhook URL from api.slack.com/apps |
+| `template` | — | Message template — supports Slack mrkdwn formatting |
 
 ---
 
 ### Discord
 
-Uses [Discord webhooks](https://discord.com/developers/docs/resources/webhook) — available on any channel.
+Uses [Discord webhooks](https://discord.com/developers/docs/resources/webhook) — available on any server channel without any special permissions setup.
 
-**Setup:**
+**Getting your webhook URL:**
 
-1. Open Discord → Channel Settings → Integrations → Webhooks → New Webhook
-2. Copy the webhook URL → `DISCORD_WEBHOOK`
+```
+1. Open Discord → right-click your server → Server Settings → Integrations → Webhooks
+   (or: open the channel → click the gear icon → Integrations → Webhooks)
+2. Click "New Webhook"
+3. Give it a name and choose the channel
+4. Click "Copy Webhook URL"
+```
 
+**`.env`:**
+```bash
+DISCORD_WEBHOOK=https://discord.com/api/webhooks/1234567890/XXXXXXXXXXXXXXXX
+```
+
+**Config:**
 ```js
 {
   type:       'discord',
-  webhookUrl: process.env.DISCORD_WEBHOOK, // required
-  template:   '🚨 **{{ruleName}}** — {{count}} matches at {{timestamp}}', // optional
+  webhookUrl: process.env.DISCORD_WEBHOOK,  // required
+  template:   '**[{{severity}}] {{ruleName}}**\n```{{line}}```\n{{env}} • {{hostname}} • {{timestamp}}',
 }
 ```
 
-Alert embeds are automatically colour-coded by severity: red for `critical`, amber for `warning`, blue for `info`.
+Alerts are sent as rich embeds — automatically colour-coded by severity:
+
+| Severity | Embed colour |
+|---|---|
+| `critical` | 🔴 Red |
+| `warning` | 🟡 Amber |
+| `info` | 🔵 Blue |
+
+| Field | Required | Description |
+|---|---|---|
+| `webhookUrl` | ✅ | Discord webhook URL |
+| `template` | — | Message template — supports Discord markdown |
 
 ---
 
 ### Email
 
-Uses [nodemailer](https://nodemailer.com) — works with any SMTP provider (Gmail, AWS SES, Mailgun, Postmark, etc.).
+Uses [nodemailer](https://nodemailer.com) — works with Gmail, AWS SES, Mailgun, Postmark, Sendgrid, or any SMTP provider. The transport is created once at startup and reused for all sends.
 
+**Gmail setup:**
+
+Gmail requires an App Password (not your login password) when 2FA is enabled:
+```
+1. Go to myaccount.google.com → Security → 2-Step Verification → App passwords
+2. Create a new app password for "Mail"
+3. Use that 16-character password as SMTP_PASS
+```
+
+**`.env`:**
+```bash
+# Gmail
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=you@gmail.com
+SMTP_PASS=abcd efgh ijkl mnop    # App Password (spaces are fine)
+ALERT_FROM=you@gmail.com
+ALERT_TO=oncall@yourteam.com
+
+# AWS SES (us-east-1)
+# SMTP_HOST=email-smtp.us-east-1.amazonaws.com
+# SMTP_PORT=587
+# SMTP_USER=AKIAIOSFODNN7EXAMPLE
+# SMTP_PASS=your_ses_smtp_password
+```
+
+**Config:**
 ```js
 {
-  type:     'email',
-  host:     process.env.SMTP_HOST,  // e.g. 'smtp.gmail.com'
-  port:     587,
-  user:     process.env.SMTP_USER,
-  pass:     process.env.SMTP_PASS,
-  from:     'alerts@yourapp.com',
-  to:       'oncall@yourteam.com',  // comma-separated for multiple recipients
+  type:  'email',
+  host:  process.env.SMTP_HOST,
+  port:  Number(process.env.SMTP_PORT),
+  user:  process.env.SMTP_USER,
+  pass:  process.env.SMTP_PASS,
+  from:  process.env.ALERT_FROM,
+  to:    process.env.ALERT_TO,   // comma-separate for multiple: 'a@x.com,b@x.com'
 }
 ```
+
+Emails are sent with both a plain text body (using the template) and an HTML body with a formatted card layout.
 
 | Field | Required | Description |
 |---|---|---|
 | `host` | ✅ | SMTP server hostname |
-| `port` | ✅ | SMTP port (`587` for TLS, `465` for SSL, `25` for plain) |
+| `port` | ✅ | `587` for STARTTLS, `465` for SSL, `25` for plain |
 | `user` | ✅ | SMTP username |
 | `pass` | ✅ | SMTP password or app-specific password |
 | `from` | ✅ | Sender address |
-| `to` | ✅ | Recipient address(es) — comma-separated string |
+| `to` | ✅ | Recipient address(es) — comma-separated |
+
+---
+
+### Using all four adapters together
+
+```js
+// alertengine.config.js — full multi-adapter example
+export default {
+  watchers: [
+    { type: 'file', path: './logs/app.log' },
+  ],
+  rules: [
+    {
+      name: 'fatal-error',
+      match: /FATAL|unhandledRejection|uncaughtException/i,
+      cooldownMs: 60_000,
+      severity: 'critical',
+      // Override message per adapter for critical alerts
+      templates: {
+        telegram: '🚨 *CRITICAL: {{ruleName}}*\n`{{line}}`\n_{{timestamp}}_',
+        slack:    ':fire: *CRITICAL: {{ruleName}}*\n>{{line}}',
+        discord:  '🔥 **CRITICAL: {{ruleName}}**\n```{{line}}```',
+      },
+    },
+    {
+      name: 'error-spike',
+      match: /\bERROR\b/i,
+      threshold: { count: 10, windowMs: 120_000 },
+      cooldownMs: 300_000,
+      severity: 'warning',
+    },
+  ],
+  adapters: [
+    // Personal Telegram alert — instant, always on
+    {
+      type:     'telegram',
+      token:    process.env.TG_TOKEN,
+      chatId:   process.env.TG_CHAT_ID,
+      template: '⚠️ *[{{severity}}] {{ruleName}}*\n`{{line}}`\n_{{env}} • {{timestamp}}_',
+    },
+    // Team Slack channel — for visibility across the team
+    {
+      type:       'slack',
+      webhookUrl: process.env.SLACK_WEBHOOK,
+      template:   ':warning: *[{{severity}}] {{ruleName}}* ({{count}} matches)\n>{{line}}\n_{{timestamp}}_',
+    },
+    // Discord server — for community or open source projects
+    {
+      type:       'discord',
+      webhookUrl: process.env.DISCORD_WEBHOOK,
+    },
+    // Email — for formal incident records and on-call rotation
+    {
+      type: 'email',
+      host: process.env.SMTP_HOST,
+      port: Number(process.env.SMTP_PORT),
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+      from: process.env.ALERT_FROM,
+      to:   process.env.ALERT_TO,
+    },
+  ],
+}
+```
 
 ---
 
 ### Custom adapters
 
-Any npm package that exports a class extending `BaseAdapter` can be used as an adapter. Name your package `alertengine-js-*` for discoverability.
+Any npm package that exports a class extending `BaseAdapter` can be used as an adapter. Name your package `alertengine-*` for discoverability.
 
 **Installing a custom adapter:**
 
 ```bash
-pnpm add nodewatchr-pagerduty
+pnpm add alertengine-pagerduty
 ```
 
 ```js
-// alertengine-js.config.js
+// alertengine.config.js
 adapters: [
-  { type: 'nodewatchr-pagerduty', routingKey: process.env.PD_KEY }
+  { type: 'alertengine-pagerduty', routingKey: process.env.PD_KEY }
 ]
 ```
 
@@ -378,7 +705,7 @@ Every adapter uses a default message template. You can override it at three leve
 
 **1. Global default** (built into the module):
 ```
-[nodewatchr] {{ruleName}}
+[alertengine-js] {{ruleName}}
 Severity: {{severity}} | Matches: {{count}} | Time: {{timestamp}}
 Line: {{line}}
 ```
@@ -432,9 +759,9 @@ npx alertengine-js [options]
 
 | Option | Default | Description |
 |---|---|---|
-| `-c, --config <path>` | `./alertengine-js.config.js` | Path to config file |
+| `-c, --config <path>` | `./alertengine.config.js` | Path to config file |
 | `--no-hot-reload` | — | Disable live config reload on file change |
-| `--dead-letter-dir <path>` | `.nodewatchr/failed` | Directory for failed alert logs |
+| `--dead-letter-dir <path>` | `.alertengine/failed` | Directory for failed alert logs |
 | `-V, --version` | — | Print version number |
 | `-h, --help` | — | Print help |
 
@@ -442,30 +769,30 @@ npx alertengine-js [options]
 
 ```bash
 # Use a custom config path
-npx alertengine-js --config /etc/myapp/alertengine-js.config.js
+npx alertengine-js --config /etc/myapp/alertengine.config.js
 
 # Disable hot reload (useful in Docker where inotify may be limited)
 npx alertengine-js --no-hot-reload
 
 # Custom dead-letter directory
-npx alertengine-js --dead-letter-dir /var/log/nodewatchr/failed
+npx alertengine-js --dead-letter-dir /var/log/alertengine-js/failed
 ```
 
 **Hot config reload:**
 
-When hot reload is enabled (the default), editing your config file while nodewatchr is running automatically swaps in the new rules without restarting. If the new config fails Zod validation, the error is logged and the previous valid config continues running.
+When hot reload is enabled (the default), editing your config file while alertengine-js is running automatically swaps in the new rules without restarting. If the new config fails Zod validation, the error is logged and the previous valid config continues running.
 
 ---
 
 ## Programmatic usage
 
-You can use nodewatchr as a library inside your own application without the CLI:
+You can use alertengine-js as a library inside your own application without the CLI:
 
 ```js
 import { Monitor, FileWatcher, StreamWatcher, loadConfig } from 'alertengine-js';
 
 // Load and validate config from file
-const config = await loadConfig('./alertengine-js.config.js');
+const config = await loadConfig('./alertengine.config.js');
 
 // Or construct config inline
 const monitor = new Monitor({
@@ -540,7 +867,7 @@ await monitor.start();
 Use as a Fastify plugin that taps into the Pino log stream:
 
 ```js
-// plugins/nodewatchr.js
+// plugins/alertengine-js.js
 import fp from 'fastify-plugin';
 import { PassThrough } from 'stream';
 import { Monitor, StreamWatcher } from 'alertengine-js';
@@ -553,7 +880,7 @@ export default fp(async function(fastify, opts) {
   await monitor.start();
 
   fastify.addHook('onClose', () => monitor.stop());
-}, { name: 'nodewatchr' });
+}, { name: 'alertengine-js' });
 ```
 
 ### Next.js
@@ -589,9 +916,9 @@ export async function register() {
 ## Project structure
 
 ```
-nodewatchr/
+alertengine-js/
 ├── bin/
-│   └── nodewatchr.js          # CLI entry point
+│   └── alertengine-js.js      # CLI entry point
 ├── src/
 │   ├── index.js               # Public API exports
 │   ├── bootstrap.js           # CLI startup logic (also importable)
@@ -622,7 +949,7 @@ nodewatchr/
 │   ├── express/
 │   ├── fastify/
 │   └── nextjs/
-├── alertengine-js.config.example.js
+├── alertengine.config.example.js
 ├── package.json
 └── pnpm-lock.yaml
 ```
@@ -633,8 +960,8 @@ nodewatchr/
 
 ```bash
 # Clone and install
-git clone https://github.com/Praveenpn180/nodewatchr.git
-cd nodewatchr
+git clone https://github.com/Praveenpn180/alertengine-js.git
+cd alertengine-js
 pnpm install
 
 # Run tests

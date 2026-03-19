@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// bin/nodewatchr.js
+// bin/alertengine-js.js
 import { program } from 'commander';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
@@ -10,11 +10,11 @@ const { version } = JSON.parse(
 );
 
 program
-  .name('nodewatchr')
+  .name('alertengine-js')
   .version(version)
-  .option('-c, --config <path>', 'config file path', './nodewatchr.config.js')
+  .option('-c, --config <path>', 'config file path', './alertengine.config.js')
   .option('--no-hot-reload', 'disable hot config reload')
-  .option('--dead-letter-dir <path>', 'directory for failed alerts', '.nodewatchr/failed')
+  .option('--dead-letter-dir <path>', 'directory for failed alerts', '.alertengine/failed')
   .parse();
 
 const opts = program.opts();

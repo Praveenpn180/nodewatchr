@@ -6,7 +6,7 @@ export class Dispatcher {
   constructor(adapters, options = {}) {
     this.adapters = adapters;
     this.maxRetries = options.maxRetries ?? 3;
-    this.deadLetterDir = options.deadLetterDir ?? '.nodewatchr/failed';
+    this.deadLetterDir = options.deadLetterDir ?? '.alertengine/failed';
   }
 
   async dispatch(alert) {

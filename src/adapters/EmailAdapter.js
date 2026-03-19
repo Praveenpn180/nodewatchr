@@ -20,7 +20,7 @@ export class EmailAdapter extends BaseAdapter {
     await this._transport.sendMail({
       from: this.config.from,
       to: this.config.to,
-      subject: `[nodewatchr] ${rule.name} — ${count} match${count > 1 ? 'es' : ''}`,
+      subject: `[alertengine-js] ${rule.name} — ${count} match${count > 1 ? 'es' : ''}`,
       text: this.formatText(alert),
       html: this._html(alert),
     });

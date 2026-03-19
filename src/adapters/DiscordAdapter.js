@@ -20,7 +20,7 @@ export class DiscordAdapter extends BaseAdapter {
             { name: 'Time', value: this.formatTimestamp(timestamp), inline: true },
             { name: 'Line', value: `\`\`\`${line.slice(0, 1000)}\`\`\`` },
           ],
-          footer: { text: 'nodewatchr' },
+          footer: { text: 'alertengine-js' },
           timestamp: new Date(timestamp).toISOString(),
         }],
       }),

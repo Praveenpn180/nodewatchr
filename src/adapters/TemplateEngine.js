@@ -27,7 +27,7 @@ export class TemplateEngine {
 
   static default() {
     return new TemplateEngine(
-      '[nodewatchr] {{ruleName}}\n' +
+      '[alertengine-js] {{ruleName}}\n' +
       'Severity: {{severity}} | Matches: {{count}} | Time: {{timestamp}}\n' +
       'Line: {{line}}'
     );
