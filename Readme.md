@@ -1,11 +1,11 @@
-# alertengine
+# alertengine-js
 
 > Configurable log monitoring and alerting for Node.js applications.
 
 Watch `stdout`, `stderr`, or log files and fire alerts to **Telegram**, **Slack**, **Discord**, or **Email** when configurable rules are triggered — with zero build step required.
 
 [![CI](https://github.com/Praveenpn180/nodewatchr/actions/workflows/ci.yml/badge.svg)](https://github.com/Praveenpn180/nodewatchr/actions/workflows/ci.yml)
-[![npm version](https://img.shields.io/npm/v/alertengine)](https://www.npmjs.com/package/alertengine)
+[![npm version](https://img.shields.io/npm/v/alertengine-js)](https://www.npmjs.com/package/alertengine-js)
 [![Node.js >= 18](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](https://nodejs.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -46,7 +46,7 @@ Watch `stdout`, `stderr`, or log files and fire alerts to **Telegram**, **Slack*
 - **Alert deduplication** — fingerprints alerts to suppress noise and prevent storm conditions
 - **Per-rule cooldowns** — configurable silence windows after an alert fires
 - **Four built-in adapters** — Telegram, Slack, Discord, and Email (SMTP)
-- **Custom adapter support** — install any `alertengine-*` adapter from npm
+- **Custom adapter support** — install any `alertengine-js-*` adapter from npm
 - **Alert templating** — per-rule, per-adapter message templates with token substitution
 - **Hot config reload** — edit rules without restarting the process
 - **Dead-letter logging** — failed alerts written to disk for replay
@@ -58,13 +58,13 @@ Watch `stdout`, `stderr`, or log files and fire alerts to **Telegram**, **Slack*
 
 ```bash
 # pnpm
-pnpm add alertengine
+pnpm add alertengine-js
 
 # npm
-npm install alertengine
+npm install alertengine-js
 
 # yarn
-yarn add alertengine
+yarn add alertengine-js
 ```
 
 ---
@@ -74,7 +74,7 @@ yarn add alertengine
 **1. Copy the example config:**
 
 ```bash
-cp alertengine.config.example.js alertengine.config.js
+cp alertengine-js.config.example.js alertengine-js.config.js
 ```
 
 **2. Set your notification credentials as environment variables:**
@@ -94,7 +94,7 @@ touch test.log
 **4. Run:**
 
 ```bash
-npx alertengine --config ./alertengine.config.js
+npx alertengine-js --config ./alertengine-js.config.js
 ```
 
 **5. Trigger a test alert in a second terminal:**
@@ -125,10 +125,10 @@ Every line emitted by a watcher is evaluated against all configured rules. If a 
 
 ## Config reference
 
-Create a `alertengine.config.js` file (or `.json`) in your project root:
+Create a `alertengine-js.config.js` file (or `.json`) in your project root:
 
 ```js
-// alertengine.config.js
+// alertengine-js.config.js
 export default {
   watchers: [ ... ],
   rules:    [ ... ],
@@ -331,7 +331,7 @@ Uses [nodemailer](https://nodemailer.com) — works with any SMTP provider (Gmai
 
 ### Custom adapters
 
-Any npm package that exports a class extending `BaseAdapter` can be used as an adapter. Name your package `alertengine-*` for discoverability.
+Any npm package that exports a class extending `BaseAdapter` can be used as an adapter. Name your package `alertengine-js-*` for discoverability.
 
 **Installing a custom adapter:**
 
@@ -340,7 +340,7 @@ pnpm add nodewatchr-pagerduty
 ```
 
 ```js
-// alertengine.config.js
+// alertengine-js.config.js
 adapters: [
   { type: 'nodewatchr-pagerduty', routingKey: process.env.PD_KEY }
 ]
@@ -350,7 +350,7 @@ adapters: [
 
 ```js
 // my-adapter/index.js
-import { BaseAdapter } from 'alertengine/adapters/base';
+import { BaseAdapter } from 'alertengine-js/adapters/base';
 
 export default class MyAdapter extends BaseAdapter {
   async send(alert) {
@@ -427,12 +427,12 @@ rules: [
 ## CLI usage
 
 ```bash
-npx alertengine [options]
+npx alertengine-js [options]
 ```
 
 | Option | Default | Description |
 |---|---|---|
-| `-c, --config <path>` | `./alertengine.config.js` | Path to config file |
+| `-c, --config <path>` | `./alertengine-js.config.js` | Path to config file |
 | `--no-hot-reload` | — | Disable live config reload on file change |
 | `--dead-letter-dir <path>` | `.nodewatchr/failed` | Directory for failed alert logs |
 | `-V, --version` | — | Print version number |
@@ -442,13 +442,13 @@ npx alertengine [options]
 
 ```bash
 # Use a custom config path
-npx alertengine --config /etc/myapp/alertengine.config.js
+npx alertengine-js --config /etc/myapp/alertengine-js.config.js
 
 # Disable hot reload (useful in Docker where inotify may be limited)
-npx alertengine --no-hot-reload
+npx alertengine-js --no-hot-reload
 
 # Custom dead-letter directory
-npx alertengine --dead-letter-dir /var/log/nodewatchr/failed
+npx alertengine-js --dead-letter-dir /var/log/nodewatchr/failed
 ```
 
 **Hot config reload:**
@@ -462,10 +462,10 @@ When hot reload is enabled (the default), editing your config file while nodewat
 You can use nodewatchr as a library inside your own application without the CLI:
 
 ```js
-import { Monitor, FileWatcher, StreamWatcher, loadConfig } from 'alertengine';
+import { Monitor, FileWatcher, StreamWatcher, loadConfig } from 'alertengine-js';
 
 // Load and validate config from file
-const config = await loadConfig('./alertengine.config.js');
+const config = await loadConfig('./alertengine-js.config.js');
 
 // Or construct config inline
 const monitor = new Monitor({
@@ -516,7 +516,7 @@ Watch a child process's stdout and stderr for errors:
 ```js
 // monitor.js
 import { spawn } from 'child_process';
-import { Monitor, StreamWatcher } from 'alertengine';
+import { Monitor, StreamWatcher } from 'alertengine-js';
 
 const child = spawn('node', ['server.js'], { stdio: ['inherit', 'pipe', 'pipe'] });
 
@@ -543,7 +543,7 @@ Use as a Fastify plugin that taps into the Pino log stream:
 // plugins/nodewatchr.js
 import fp from 'fastify-plugin';
 import { PassThrough } from 'stream';
-import { Monitor, StreamWatcher } from 'alertengine';
+import { Monitor, StreamWatcher } from 'alertengine-js';
 
 export default fp(async function(fastify, opts) {
   const logStream = new PassThrough();
@@ -565,7 +565,7 @@ Use with the [Next.js instrumentation hook](https://nextjs.org/docs/app/building
 export async function register() {
   if (process.env.NEXT_RUNTIME !== 'nodejs') return;
 
-  const { Monitor, FileWatcher } = await import('alertengine');
+  const { Monitor, FileWatcher } = await import('alertengine-js');
 
   const monitor = new Monitor({
     rules: [
@@ -622,7 +622,7 @@ nodewatchr/
 │   ├── express/
 │   ├── fastify/
 │   └── nextjs/
-├── alertengine.config.example.js
+├── alertengine-js.config.example.js
 ├── package.json
 └── pnpm-lock.yaml
 ```
