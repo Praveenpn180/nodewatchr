@@ -1,6 +1,6 @@
 {
-  "name": "nodewatchr",
-  "version": "0.1.2",
+  "name": "alertengine",
+  "version": "0.1.3",
   "type": "module",
   "description": "Configurable log monitoring and alerting for Node.js applications",
   "main": "./src/index.js",
