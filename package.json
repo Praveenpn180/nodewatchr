@@ -1,6 +1,6 @@
 {
   "name": "@praveenpn180/nodewatchr",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "description": "Configurable log monitoring and alerting for Node.js applications",
   "main": "./src/index.js",
@@ -10,6 +10,10 @@
   },
   "bin": {
     "nodewatchr": "./bin/nodewatchr.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Praveenpn180/nodewatchr.git"
   },
   "engines": {
     "node": ">=18"
