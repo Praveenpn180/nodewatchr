@@ -3,12 +3,14 @@ import { TelegramAdapter } from './TelegramAdapter.js';
 import { SlackAdapter }    from './SlackAdapter.js';
 import { DiscordAdapter }  from './DiscordAdapter.js';
 import { EmailAdapter }    from './EmailAdapter.js';
+import { WebhookAdapter }  from './WebhookAdapter.js';
 
 const BUILT_IN = {
   telegram: TelegramAdapter,
   slack:    SlackAdapter,
   discord:  DiscordAdapter,
   email:    EmailAdapter,
+  webhook:  WebhookAdapter,
 };
 
 export async function resolveAdapters(adapterConfigs) {

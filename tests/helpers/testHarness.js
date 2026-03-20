@@ -4,13 +4,13 @@ import { join } from 'path';
 import { Monitor } from '../../src/Monitor.js';
 import { FileWatcher } from '../../src/ingestion/FileWatcher.js';
 
-export async function createHarness(rules, adapterStubs = []) {
+export async function createHarness(rules, adapterStubs = [], monitorOptions = {}) {
   const dir = await mkdtemp(join(tmpdir(), 'alertengine-'));
   const file = join(dir, 'test.log');
 
   await appendFile(file, '');
 
-  const monitor = new Monitor({ rules, adapters: [] });
+  const monitor = new Monitor({ rules, adapters: [], ...monitorOptions });
   monitor.dispatcher = {
     dispatch: async (alert) => {
       await Promise.allSettled(adapterStubs.map(stub => stub(alert)));
@@ -24,11 +24,13 @@ export async function createHarness(rules, adapterStubs = []) {
 
   return {
     monitor,
+    dir,
+    file,
     writeLine: line => appendFile(file, `${line}\n`),
     cleanup: async () => {
-      monitor.stop();
       watcher.stop();
-      await rm(dir, { recursive: true });
+      await monitor.stop();
+      await rm(dir, { recursive: true, force: true });
     },
   };
 }

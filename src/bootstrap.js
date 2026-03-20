@@ -10,10 +10,10 @@ export async function bootstrap({ configPath, hotReload, deadLetterDir }) {
   const monitor = await createMonitor(config, deadLetterDir);
 
   if (hotReload) {
-    const cw = new ConfigWatcher(configPath);
+    const cw = new ConfigWatcher(configPath, { initialConfig: config });
     cw.on('reload', async (newConfig) => {
       console.log('[alertengine-js] config reloaded');
-      await monitor.swapRules(newConfig.rules);
+      await monitor.reconfigure(newConfig);
     });
     cw.on('error', (err) => {
       console.error('[alertengine-js] config reload failed:', err.message);
@@ -44,7 +44,7 @@ async function createMonitor(config, deadLetterDir) {
 function attachSignalHandlers(monitor) {
   const shutdown = async (signal) => {
     console.log(`\n[alertengine-js] ${signal} received, shutting down…`);
-    monitor.stop();
+    await monitor.stop();
     process.exit(0);
   };
   process.on('SIGINT',  () => shutdown('SIGINT'));
