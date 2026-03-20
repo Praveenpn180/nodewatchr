@@ -7,18 +7,20 @@ export class AlertBuffer extends EventEmitter {
     this._cooldowns = new Map();
   }
 
-  ingest({ rule, line, timestamp, count }) {
+  // contextLines is now forwarded — previously it was silently dropped because
+  // the destructure only listed { rule, line, timestamp, count }.
+  ingest({ rule, line, timestamp, count, contextLines }) {
     const fingerprint = this._fingerprint(rule.name, line);
     const cooldownKey = rule.name;
-    const lastFired = this._cooldowns.get(cooldownKey) ?? 0;
-    const cooldown = rule.cooldownMs ?? 60_000;
+    const lastFired   = this._cooldowns.get(cooldownKey) ?? 0;
+    const cooldown    = rule.cooldownMs ?? 60_000;
 
     if (timestamp - lastFired < cooldown) {
       return;
     }
 
     this._cooldowns.set(cooldownKey, timestamp);
-    this.emit('alert', { rule, line, timestamp, count, fingerprint });
+    this.emit('alert', { rule, line, timestamp, count, fingerprint, contextLines });
   }
 
   _fingerprint(ruleName, line) {
@@ -38,14 +40,12 @@ export class AlertBuffer extends EventEmitter {
   startCleanup(intervalMs = 600_000) {
     this._cleanupTimer = setInterval(() => {
       const now = Date.now();
-
       for (const [key, lastFired] of this._cooldowns) {
         if (now - lastFired > 3_600_000) {
           this._cooldowns.delete(key);
         }
       }
     }, intervalMs);
-
     this._cleanupTimer.unref();
   }
 

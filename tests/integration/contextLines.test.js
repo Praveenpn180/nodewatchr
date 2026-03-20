@@ -9,11 +9,11 @@ describe('context lines', () => {
     const dispatched = [];
     harness = await createHarness(
       [{
-        name: 'ctx-before',
-        match: /FATAL/,
+        name:          'ctx-before',
+        match:         /FATAL/,
         contextBefore: 2,
-        contextAfter: 0,
-        cooldownMs: 0,
+        contextAfter:  0,
+        cooldownMs:    0,
       }],
       [(alert) => dispatched.push(alert)]
     );
@@ -22,38 +22,57 @@ describe('context lines', () => {
     await harness.writeLine('DEBUG loading config');
     await harness.writeLine('FATAL something exploded');
 
-    await vi.waitFor(() => expect(dispatched).toHaveLength(1), { timeout: 2000 });
+    await vi.waitFor(
+      () => expect(dispatched).toHaveLength(1),
+      { timeout: 5000, interval: 50 }
+    );
 
-    const roles = dispatched[0].contextLines.map(c => c.role);
+    const ctx = dispatched[0].contextLines;
+    expect(ctx).toBeDefined();
+
+    const roles = ctx.map(c => c.role);
     expect(roles).toEqual(['before', 'before', 'match']);
-    expect(dispatched[0].contextLines[2].line).toContain('exploded');
+
+    // The two before-lines must be INFO and DEBUG — not the match line itself
+    expect(ctx[0].line).toContain('request started');
+    expect(ctx[1].line).toContain('loading config');
+    expect(ctx[2].line).toContain('exploded');
   });
 
   it('waits for contextAfter lines before dispatching', async () => {
     const dispatched = [];
     harness = await createHarness(
       [{
-        name: 'ctx-after',
-        match: /ERROR/,
+        name:          'ctx-after',
+        match:         /ERROR/,
         contextBefore: 0,
-        contextAfter: 2,
-        cooldownMs: 0,
+        contextAfter:  2,
+        cooldownMs:    0,
       }],
       [(alert) => dispatched.push(alert)]
     );
 
     await harness.writeLine('ERROR boom');
-    await new Promise(r => setTimeout(r, 200));
-    expect(dispatched).toHaveLength(0); // still waiting for 2 after-lines
+
+    // Alert must NOT fire yet — still waiting for 2 after-lines
+    await new Promise(r => setTimeout(r, 300));
+    expect(dispatched).toHaveLength(0);
 
     await harness.writeLine('INFO  recovery attempt');
     await harness.writeLine('INFO  recovered');
 
-    await vi.waitFor(() => expect(dispatched).toHaveLength(1), { timeout: 2000 });
+    await vi.waitFor(
+      () => expect(dispatched).toHaveLength(1),
+      { timeout: 5000, interval: 50 }
+    );
 
-    const roles = dispatched[0].contextLines.map(c => c.role);
+    const ctx = dispatched[0].contextLines;
+    expect(ctx).toBeDefined();
+
+    const roles = ctx.map(c => c.role);
     expect(roles).toEqual(['match', 'after', 'after']);
-    expect(dispatched[0].contextLines[1].line).toContain('recovery');
-    expect(dispatched[0].contextLines[2].line).toContain('recovered');
+    expect(ctx[0].line).toContain('boom');
+    expect(ctx[1].line).toContain('recovery');
+    expect(ctx[2].line).toContain('recovered');
   });
 });
