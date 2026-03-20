@@ -12,7 +12,10 @@ export class LineRingBuffer {
     }
   }
 
+  // slice(-0) === slice(0) in JS — returns the whole array.
+  // Guard explicitly so tail(0) always returns [].
   tail(n) {
+    if (n <= 0) return [];
     return this._buf.slice(-n);
   }
 }
