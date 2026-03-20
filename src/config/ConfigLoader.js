@@ -26,6 +26,8 @@ const RuleSchema = z.object({
   severity:   z.enum(['critical', 'warning', 'info']).optional(),
   templates:  z.record(z.string()).optional(),
   resetOnFire: z.boolean().default(true),
+  contextBefore: z.number().int().min(0).default(0),
+  contextAfter:  z.number().int().min(0).default(0),
 });
 
 const AdapterSchema = z.discriminatedUnion('type', [
