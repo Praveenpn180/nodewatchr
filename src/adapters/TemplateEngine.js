@@ -8,6 +8,13 @@ const BUILT_IN_TOKENS = {
   '{{severity}}':   a => a.rule.severity ?? 'warning',
   '{{env}}':        _  => process.env.NODE_ENV ?? 'unknown',
   '{{hostname}}':   _  => process.env.HOSTNAME ?? 'unknown',
+  '{{contextLines}}': a => {
+    if (!a.contextLines?.length) return '';
+    return a.contextLines.map(c => {
+      const prefix = c.role === 'match' ? '>>> ' : '    ';
+      return `${prefix}${c.line}`;
+    }).join('\n');
+  },
 };
 
 export class TemplateEngine {
